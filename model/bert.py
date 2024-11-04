@@ -6,7 +6,10 @@ import torch.nn.functional as F
 class BERP(nn.Module):
     def __init__(self, magic_layer: nn.Module, vocab_size: int, embedding_dim: int):
         super().__init__()
+
+        # Must return tensor of the same shape
         self.magic_layer = magic_layer
+
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.projection = nn.Linear(embedding_dim, vocab_size)
 
