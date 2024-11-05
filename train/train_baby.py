@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import wandb
+from tqdm import tqdm
 
 repo_dir = Path(__file__).parent.parent
 sys.path.append(str(repo_dir))
@@ -20,7 +21,7 @@ EMBEDDING_DIM = 10
 VOCAB_SIZE = dataset.vocab_size
 
 magic_layers = {
-    "identity": lambda x: x,
+    # "identity": lambda x: x,
     "linear": nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
     "non-linear": nn.Sequential(
         nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
@@ -33,8 +34,12 @@ magic_layers = {
     ),
 }
 
-dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=True)
+dataloader = DataLoader(
+    dataset, batch_size=32, shuffle=True, collate_fn=dataset.collate_fn
+)
+val_dataloader = DataLoader(
+    val_dataset, batch_size=32, shuffle=True, collate_fn=val_dataset.collate_fn
+)
 
 wandb_project = "baby-bert"
 
@@ -46,15 +51,17 @@ for name, magic_layer in magic_layers.items():
 
     wandb.init(project=wandb_project, name=f"baby-bert-{name}")
 
+    criterion = nn.CrossEntropyLoss()
+
     # Train
-    for epoch in range(100):
-        for batch in dataloader:
+    for epoch in range(10):
+        for batch in tqdm(dataloader, desc=f"Training {name} {epoch}:"):
             optimizer.zero_grad()
             inputs, targets = batch
 
             outputs = bert(inputs)
 
-            loss = F.cross_entropy(outputs, targets)
+            loss = criterion(outputs.view(-1, VOCAB_SIZE), targets.view(-1))
 
             loss.backward()
 
@@ -64,12 +71,14 @@ for name, magic_layer in magic_layers.items():
 
         # manual eval
         if not epoch % 1:
-            for batch in val_dataloader:
+            for batch in tqdm(val_dataloader, desc=f"Validating {name} {epoch}"):
                 with torch.no_grad():
                     inputs, targets = batch
 
                     outputs = bert(inputs)
 
-                    loss = F.cross_entropy(outputs, targets)
+                    loss = criterion(outputs.view(-1, VOCAB_SIZE), targets.view(-1))
 
                     wandb.log({"val_loss": loss})
+
+    wandb.finish()
