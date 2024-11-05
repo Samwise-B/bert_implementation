@@ -31,6 +31,23 @@ class BERP(nn.Module):
         return predictions
 
 
+class Naive(nn.Module):
+    def __init__(self, embedding_dim: int):
+        super().__init__()
+        self.relu = nn.ReLU()
+
+    def forward(self, embeddings: torch.Tensor):
+        # Embeddings: [batch_size, seq_len, embedding_dim]
+
+        # [batch_size, seq_len, seq_len]
+        x = torch.bmm(embeddings, embeddings.transpose(-1, -2))
+
+        # [batch_size, seq_len, embedding_dim]
+        transformed = torch.bmm(x, embeddings)
+
+        return self.relu(transformed)
+
+
 if __name__ == "__main__":
     magic_layer = nn.Linear(768, 768)
     bert = BERP(magic_layer, 30522, 768)

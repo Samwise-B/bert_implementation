@@ -19,6 +19,7 @@ class BabyDataset(Dataset):
 
         tokens = tokenizer.encode(corpus, out_type=int)
         self.windows_tkns = list(windowed(tokens, context_window))
+        self.vocab_size = tokenizer.get_piece_size()
 
     def __len__(self):
         return len(self.windows_tkns)
