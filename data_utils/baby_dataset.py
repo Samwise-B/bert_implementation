@@ -11,15 +11,15 @@ class BabyDataset(Dataset):
         context_window=10,
         spm_model_path="m.model",
     ):
-        tokenizer = spm.SentencePieceProcessor(model_file=spm_model_path)
+        self.tokenizer = spm.SentencePieceProcessor(model_file=spm_model_path)
 
         with open(corpus_path, "r", encoding="utf-8") as f:
             all_files = f.readlines()
         corpus = "".join(all_files)
 
-        tokens = tokenizer.encode(corpus, out_type=int)
+        tokens = self.tokenizer.encode(corpus, out_type=int)
         self.windows_tkns = list(windowed(tokens, context_window))
-        self.vocab_size = tokenizer.get_piece_size()
+        self.vocab_size = self.tokenizer.get_piece_size()
 
     def __len__(self):
         return len(self.windows_tkns)

@@ -14,26 +14,34 @@ repo_dir = Path(__file__).parent.parent
 sys.path.append(str(repo_dir))
 
 from data_utils.baby_dataset import BabyDataset
-from model.bert import Naive, BERP
+from model.bert import Naive, BERP, OwnSingleHeadTransformer, OwnMultiHeadTransformer
 
-dataset = BabyDataset()
-val_dataset = BabyDataset(corpus_path="data/val_text.txt")
 
-EMBEDDING_DIM = 10
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+dataset = BabyDataset(context_window=100)
+val_dataset = BabyDataset(context_window=100, corpus_path="data/val_text.txt")
+
+EMBEDDING_DIM = 100
+FF_DIM = 400
 VOCAB_SIZE = dataset.vocab_size
 
 magic_layers = {
     # "identity": lambda x: x,
-    "linear": nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
-    "non-linear": nn.Sequential(
-        nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
-        nn.ReLU(),
-    ),
-    "naive": Naive(EMBEDDING_DIM),
-    "multi-naive": nn.Sequential(
-        Naive(EMBEDDING_DIM),
-        Naive(EMBEDDING_DIM),
-    ),
+    # "linear": nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
+    # "non-linear": nn.Sequential(
+    #     nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
+    #     nn.ReLU(),
+    # ),
+    # "naive": Naive(EMBEDDING_DIM),
+    # "multi-naive": nn.Sequential(
+    #     Naive(EMBEDDING_DIM),
+    #     Naive(EMBEDDING_DIM),
+    # ),
+    # "own-single-head-transformer": OwnSingleHeadTransformer(EMBEDDING_DIM, FF_DIM),
+    "own-multi-head-transformer": OwnMultiHeadTransformer(EMBEDDING_DIM, 2, FF_DIM),
 }
 
 dataloader = DataLoader(
@@ -55,7 +63,11 @@ for name, magic_layer in magic_layers.items():
 
     optimizer = torch.optim.Adam(bert.parameters(), lr=1e-3)
 
-    wandb.init(project=wandb_project, name=f"baby-bert-{name}")
+    wandb.init(
+        project=wandb_project,
+        name=f"baby-bert-{name}",
+        config={"parameter_count": count_parameters(bert)},
+    )
 
     criterion = nn.CrossEntropyLoss()
 

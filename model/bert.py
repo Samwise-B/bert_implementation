@@ -61,7 +61,6 @@ class OwnSingleHeadTransformer(nn.Module):
             nn.ReLU(),
             nn.Linear(ff_dim, embedding_dim),
         )
-        self.relu = nn.ReLU()
 
     def forward(self, embeddings: torch.Tensor):
         # Embeddings: [batch_size, seq_len, embedding_dim]
@@ -84,6 +83,59 @@ class OwnSingleHeadTransformer(nn.Module):
 
         # [batch_size, seq_len, embedding_dim]
         return self.ff(attn_emb)
+
+
+class OwnMultiHeadTransformer(nn.Module):
+    def __init__(self, embedding_dim: int, num_heads: int, ff_dim: int):
+        super().__init__()
+        self.embed_dim = embedding_dim
+        self.scaling_fac = self.embed_dim ** (1 / 2)
+        if embedding_dim % num_heads:
+            raise Exception("Embed dim not divisible by num of heads")
+        self.head_dim = embedding_dim // num_heads
+
+        self.M_ks = nn.ModuleList(
+            [nn.Linear(embedding_dim, self.head_dim) for _ in range(num_heads)]
+        )
+        self.M_qs = nn.ModuleList(
+            [nn.Linear(embedding_dim, self.head_dim) for _ in range(num_heads)]
+        )
+        self.M_vs = nn.ModuleList(
+            [nn.Linear(embedding_dim, self.head_dim) for _ in range(num_heads)]
+        )
+
+        self.ff = nn.Sequential(
+            nn.Linear(embedding_dim, ff_dim),
+            nn.ReLU(),
+            nn.Linear(ff_dim, embedding_dim),
+        )
+        self.relu = nn.ReLU()
+
+    def forward(self, embeddings: torch.Tensor):
+        # Embeddings: [batch_size, seq_len, embedding_dim]
+
+        # [num_heads, batch_size, seq_len, head_dim]
+        Qs = [M_q(embeddings) for M_q in self.M_qs]
+        Ks = [M_k(embeddings) for M_k in self.M_ks]
+
+        # [num_heads, batch_size, seq_len, seq_len]
+        A_primes = [
+            torch.bmm(Q, K.transpose(-1, -2)) / self.scaling_fac for Q, K in zip(Qs, Ks)
+        ]
+
+        # num_heads[batch_size, seq_len, seq_len]
+        As = [F.softmax(A, dim=-1) for A in A_primes]
+
+        Vs = [M_v(embeddings) for M_v in self.M_vs]
+
+        # num_heads[batch_size, seq_len, head_dim]
+        Hs = [torch.bmm(A, V) for A, V in zip(As, Vs)]
+
+        # [batch_size, seq_len, num_heads*head_dim = embed_dim]
+        H = torch.cat(Hs, dim=-1)
+
+        # [batch_size, seq_len, embedding_dim]
+        return self.ff(H)
 
 
 if __name__ == "__main__":
