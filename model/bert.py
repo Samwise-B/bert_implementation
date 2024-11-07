@@ -28,9 +28,9 @@ class BERP(nn.Module):
         projected = self.projection(transformed)
 
         # [seq_len, vocab_size]
-        predictions = F.softmax(projected, dim=-1)
+        # predictions = F.softmax(projected, dim=-1)
 
-        return predictions
+        return projected
 
 
 class Naive(nn.Module):

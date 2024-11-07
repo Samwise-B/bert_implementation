@@ -40,6 +40,12 @@ transformer_layers = nn.ModuleList(
         for _ in range(NUM_TRANSFORMERS)
     ]
 )
+baseline_transformer_layers = nn.ModuleList(
+    [
+        nn.TransformerEncoderLayer(EMBEDDING_DIM, NUM_HEADS, FF_DIM)
+        for _ in range(NUM_TRANSFORMERS)
+    ]
+)
 magic_layers = {
     # "identity": lambda x: x,
     # "linear": nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
@@ -53,15 +59,16 @@ magic_layers = {
     #     Naive(EMBEDDING_DIM),
     # ),
     # "own-single-head-transformer": OwnSingleHeadTransformer(EMBEDDING_DIM, FF_DIM),
-    "BERT": nn.Sequential(*transformer_layers)
+    "BASELINE": nn.Sequential(*baseline_transformer_layers),
+    #"BERT": nn.Sequential(*transformer_layers)
 }
 
 
 dataloader = DataLoader(
-    dataset, batch_size=256, shuffle=True, collate_fn=dataset.collate_fn
+    dataset, batch_size=16, shuffle=True, collate_fn=dataset.collate_fn
 )
 val_dataloader = DataLoader(
-    val_dataset, batch_size=256, shuffle=True, collate_fn=val_dataset.collate_fn
+    val_dataset, batch_size=16, shuffle=True, collate_fn=val_dataset.collate_fn
 )
 
 wandb_project = "baby-bert"
@@ -92,8 +99,8 @@ for name, magic_layer in magic_layers.items():
             optimizer.zero_grad()
             inputs, targets = batch
 
-            inputs = inputs.to(device)
-            targets = targets.to(device)
+            # inputs = inputs.to(device)
+            # targets = targets.to(device)
 
             outputs = bert(inputs)
 
@@ -104,6 +111,8 @@ for name, magic_layer in magic_layers.items():
             optimizer.step()
 
             train_loss.append(loss.item())
+
+            wandb.log({"batch_loss": loss.item()})
 
         wandb.log({"loss": sum(train_loss) / len(train_loss)})
 

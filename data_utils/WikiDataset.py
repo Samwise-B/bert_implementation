@@ -4,6 +4,7 @@ from more_itertools import windowed
 import sentencepiece as spm
 import re
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class WikiDataset(Dataset):
     def __init__(
@@ -23,20 +24,34 @@ class WikiDataset(Dataset):
         corpus = "".join(text)
 
         tokens = self.tokenizer.encode(corpus, out_type=int)
-        self.windows_tkns = list(windowed(tokens, context_window))
+        
+        self.tnsr_tkns = torch.tensor(tokens, dtype=torch.int16, requires_grad=False)
+
+        mask = torch.rand(self.tnsr_tkns.shape) > 0.15
+        
+        self.masked_tkns = torch.where(mask, self.tnsr_tkns, 0)
+
+        self.windows = self.tnsr_tkns.unfold(dimension=0, size=context_window, step=1)
+        self.masked_windows = self.masked_tkns.unfold(dimension=0, size=context_window, step=1)
+
+        # self.windows_tkns = list(windowed(tokens, context_window))
         self.vocab_size = self.tokenizer.get_piece_size()
 
     def __len__(self):
-        return len(self.windows_tkns)
+        return self.windows.shape[0]
 
     def __getitem__(self, index):
-        return self.windows_tkns[index]
+        return self.windows[index], self.masked_windows[index]
 
-    def collate_fn(self, list_of_seq: list[list[int]]):
-        seq_tensor = torch.tensor(list_of_seq, dtype=torch.long)
+    def collate_fn(self, list_of_seq: list[torch.Tensor]):
+        input, masked = zip(*list_of_seq)
 
-        mask = torch.rand(seq_tensor.shape) > 0.15
-        masked_seq = torch.where(mask, seq_tensor, torch.tensor(0, dtype=torch.long))
+        seq_tensor = torch.stack(input, dim=0).to(device=device, dtype=torch.long)
+
+        # mask = torch.rand(seq_tensor.shape, device=device) > 0.15
+        # masked_seq = torch.where(mask, seq_tensor, 0)
+
+        masked_seq = torch.stack(masked, dim=0).to(device=device, dtype=torch.long)
         return masked_seq, seq_tensor
 
 
