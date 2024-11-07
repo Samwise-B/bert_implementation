@@ -51,7 +51,13 @@ class Naive(nn.Module):
 
 
 class OwnSingleHeadTransformer(nn.Module):
-    def __init__(self, embedding_dim: int, ff_dim: int, add_norm: bool = True):
+    def __init__(
+        self,
+        embedding_dim: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+        add_norm: bool = True,
+    ):
         super().__init__()
         self.embed_dim = embedding_dim
         self.scaling_fac = self.embed_dim ** (1 / 2)
@@ -59,10 +65,13 @@ class OwnSingleHeadTransformer(nn.Module):
         self.M_q = nn.Linear(embedding_dim, embedding_dim)
         self.M_k = nn.Linear(embedding_dim, embedding_dim)
         self.M_v = nn.Linear(embedding_dim, embedding_dim)
+        self.attn_dropout = nn.Dropout(dropout)
         self.ff = nn.Sequential(
             nn.Linear(embedding_dim, ff_dim),
             nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(ff_dim, embedding_dim),
+            nn.Dropout(dropout),
         )
         self.norm = nn.LayerNorm(embedding_dim)
 
@@ -85,6 +94,8 @@ class OwnSingleHeadTransformer(nn.Module):
         # [batch_size, seq_len, embedding_dim]
         attn_emb = torch.bmm(A, V)
 
+        attn_emb = self.attn_dropout(attn_emb)
+
         if self.add_norm:
             attn_emb = self.norm(attn_emb + embeddings)
 
@@ -94,7 +105,12 @@ class OwnSingleHeadTransformer(nn.Module):
 
 class OwnMultiHeadTransformer(nn.Module):
     def __init__(
-        self, embedding_dim: int, num_heads: int, ff_dim: int, add_norm: bool = True
+        self,
+        embedding_dim: int,
+        num_heads: int,
+        ff_dim: int,
+        dropout: float = 0.1,
+        add_norm: bool = True,
     ):
         super().__init__()
         self.embed_dim = embedding_dim
@@ -114,10 +130,15 @@ class OwnMultiHeadTransformer(nn.Module):
             [nn.Linear(embedding_dim, self.head_dim) for _ in range(num_heads)]
         )
 
+        self.concat_proj = nn.Linear(embedding_dim, embedding_dim)
+
+        self.attn_dropout = nn.Dropout(dropout)
         self.ff = nn.Sequential(
             nn.Linear(embedding_dim, ff_dim),
             nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(ff_dim, embedding_dim),
+            nn.Dropout(dropout),
         )
         self.norm = nn.LayerNorm(embedding_dim)
 
@@ -143,6 +164,9 @@ class OwnMultiHeadTransformer(nn.Module):
 
         # [batch_size, seq_len, num_heads*head_dim = embed_dim]
         H = torch.cat(Hs, dim=-1)
+
+        H = self.concat_proj(H)
+        H = self.attn_dropout(H)
 
         if self.add_norm:
             H = self.norm(H + embeddings)

@@ -13,7 +13,8 @@ from tqdm import tqdm
 repo_dir = Path(__file__).parent.parent
 sys.path.append(str(repo_dir))
 
-from data_utils.baby_dataset import BabyDataset
+# from data_utils.baby_dataset import BabyDataset
+from data_utils.WikiDataset import WikiDataset
 from model.bert import Naive, BERP, OwnSingleHeadTransformer, OwnMultiHeadTransformer
 
 
@@ -21,13 +22,24 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-dataset = BabyDataset(context_window=100)
-val_dataset = BabyDataset(context_window=100, corpus_path="data/val_text.txt")
+print("Loading data...")
+dataset = WikiDataset(context_window=512, corpus_path="data/full_train_text.txt")
+val_dataset = WikiDataset(
+    context_window=512, corpus_path="data/full_validation_text.txt"
+)
 
-EMBEDDING_DIM = 100
-FF_DIM = 400
+EMBEDDING_DIM = 768
+FF_DIM = 4 * EMBEDDING_DIM
+NUM_TRANSFORMERS = 12
+NUM_HEADS = 12
 VOCAB_SIZE = dataset.vocab_size
 
+transformer_layers = nn.ModuleList(
+    [
+        OwnMultiHeadTransformer(EMBEDDING_DIM, NUM_HEADS, FF_DIM)
+        for _ in range(NUM_TRANSFORMERS)
+    ]
+)
 magic_layers = {
     # "identity": lambda x: x,
     # "linear": nn.Linear(EMBEDDING_DIM, EMBEDDING_DIM),
@@ -41,14 +53,15 @@ magic_layers = {
     #     Naive(EMBEDDING_DIM),
     # ),
     # "own-single-head-transformer": OwnSingleHeadTransformer(EMBEDDING_DIM, FF_DIM),
-    "own-multi-head-transformer": OwnMultiHeadTransformer(EMBEDDING_DIM, 2, FF_DIM),
+    "BERT": nn.Sequential(*transformer_layers)
 }
 
+
 dataloader = DataLoader(
-    dataset, batch_size=32, shuffle=True, collate_fn=dataset.collate_fn
+    dataset, batch_size=256, shuffle=True, collate_fn=dataset.collate_fn
 )
 val_dataloader = DataLoader(
-    val_dataset, batch_size=32, shuffle=True, collate_fn=val_dataset.collate_fn
+    val_dataset, batch_size=256, shuffle=True, collate_fn=val_dataset.collate_fn
 )
 
 wandb_project = "baby-bert"
@@ -57,6 +70,7 @@ criterion = nn.CrossEntropyLoss()
 
 for name, magic_layer in magic_layers.items():
 
+    print("Loading model...")
     bert = BERP(magic_layer, vocab_size=VOCAB_SIZE, embedding_dim=EMBEDDING_DIM).to(
         device
     )

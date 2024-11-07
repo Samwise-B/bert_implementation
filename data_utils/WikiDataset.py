@@ -2,20 +2,25 @@ import torch
 from torch.utils.data import Dataset
 from more_itertools import windowed
 import sentencepiece as spm
+import re
 
 
-class BabyDataset(Dataset):
+class WikiDataset(Dataset):
     def __init__(
         self,
-        corpus_path: str = "data/text.txt",
-        context_window=10,
-        spm_model_path="m.model",
+        corpus_path: str = "data/full_train_text.txt",
+        context_window=512,
+        spm_model_path="tokenizer/tknz_30000.model",
     ):
         self.tokenizer = spm.SentencePieceProcessor(model_file=spm_model_path)
 
         with open(corpus_path, "r", encoding="utf-8") as f:
-            all_files = f.readlines()
-        corpus = "".join(all_files)
+            text = [
+                row
+                for row in f.readlines()
+                if not re.search(r"^\s*=\s*.*?\s*=\s*", row)
+            ]
+        corpus = "".join(text)
 
         tokens = self.tokenizer.encode(corpus, out_type=int)
         self.windows_tkns = list(windowed(tokens, context_window))
@@ -38,7 +43,7 @@ class BabyDataset(Dataset):
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-    dataset = BabyDataset()
+    dataset = WikiDataset()
 
     dataloader = DataLoader(dataset, 5, shuffle=True, collate_fn=dataset.collate_fn)
 
