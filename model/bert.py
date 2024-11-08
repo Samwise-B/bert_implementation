@@ -15,14 +15,14 @@ class BERP(nn.Module):
         self.embedding = nn.Embedding(vocab_size, embedding_dim)
         self.projection = nn.Linear(embedding_dim, vocab_size)
 
-    def forward(self, tokens: torch.Tensor):
+    def forward(self, tokens: torch.Tensor, mask: torch.Tensor):
         # tokens: [seq_len]
 
         # [seq_len, embedding_dim]
         embeddings = self.embedding(tokens)
 
         # [seq_len, embedding_dim]
-        transformed = self.magic_layer(embeddings)
+        transformed, _ = self.magic_layer((embeddings, mask))
 
         # [seq_len, vocab_size]
         projected = self.projection(transformed)
@@ -75,7 +75,8 @@ class OwnSingleHeadTransformer(nn.Module):
         )
         self.norm = nn.LayerNorm(embedding_dim)
 
-    def forward(self, embeddings: torch.Tensor):
+    def forward(self, x):
+        embeddings, mask = x
         # Embeddings: [batch_size, seq_len, embedding_dim]
         Q = self.M_q(embeddings)
 
@@ -84,6 +85,12 @@ class OwnSingleHeadTransformer(nn.Module):
 
         # [batch_size, seq_len, seq_len]
         A_prime = torch.bmm(Q, K.transpose(-1, -2)) / self.scaling_fac
+
+        seq_len = A_prime.shape[1]
+
+        attn_mask = mask.unsqueeze(-2).repeat(1, seq_len, 1)
+
+        masked_attn = torch.where(attn_mask, A_prime, float("-inf"))
 
         # [batch_size, seq_len, seq_len]
         A = F.softmax(A_prime, dim=-1)
@@ -100,7 +107,7 @@ class OwnSingleHeadTransformer(nn.Module):
             attn_emb = self.norm(attn_emb + embeddings)
 
         # [batch_size, seq_len, embedding_dim]
-        return self.ff(attn_emb)
+        return self.ff(attn_emb), mask
 
 
 class OwnMultiHeadTransformer(nn.Module):
@@ -142,16 +149,24 @@ class OwnMultiHeadTransformer(nn.Module):
         )
         self.norm = nn.LayerNorm(embedding_dim)
 
-    def forward(self, embeddings: torch.Tensor):
+    def forward(self, x):
+        embeddings, mask = x
         # Embeddings: [batch_size, seq_len, embedding_dim]
 
         # [num_heads, batch_size, seq_len, head_dim]
         Qs = [M_q(embeddings) for M_q in self.M_qs]
         Ks = [M_k(embeddings) for M_k in self.M_ks]
 
+        seq_len = embeddings.shape[1]
+
+        attn_mask = mask.unsqueeze(-2).repeat(1, seq_len, 1)
         # [num_heads, batch_size, seq_len, seq_len]
         A_primes = [
             torch.bmm(Q, K.transpose(-1, -2)) / self.scaling_fac for Q, K in zip(Qs, Ks)
+        ]
+
+        masked_attns = [
+            torch.where(attn_mask, A_prime, float("-inf")) for A_prime in A_primes
         ]
 
         # num_heads[batch_size, seq_len, seq_len]
@@ -172,7 +187,7 @@ class OwnMultiHeadTransformer(nn.Module):
             H = self.norm(H + embeddings)
 
         # [batch_size, seq_len, embedding_dim]
-        return self.ff(H)
+        return self.ff(H), mask
 
 
 if __name__ == "__main__":

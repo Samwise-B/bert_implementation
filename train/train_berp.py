@@ -102,12 +102,12 @@ for name, magic_layer in magic_layers.items():
         train_loss = []
         for batch in tqdm(dataloader, desc=f"Training {name} {epoch}"):
             optimizer.zero_grad()
-            inputs, targets = batch
+            inputs, targets, mask = batch
 
             # inputs = inputs.to(device)
             # targets = targets.to(device)
 
-            outputs = bert(inputs)
+            outputs = bert(inputs, mask)
 
             loss = criterion(outputs.view(-1, VOCAB_SIZE), targets.view(-1))
 

@@ -47,7 +47,7 @@ class WikiDataset(Dataset):
         mask = torch.rand(seq_tensor.shape, device=device) > 0.15
         masked_seq = torch.where(mask, seq_tensor, 0)
 
-        return masked_seq, seq_tensor
+        return masked_seq, seq_tensor, mask
 
 
 if __name__ == "__main__":
