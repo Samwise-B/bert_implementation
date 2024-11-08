@@ -22,16 +22,21 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-print("Loading data...")
-dataset = WikiDataset(context_window=256, corpus_path="data/full_train_text.txt")
-val_dataset = WikiDataset(
-    context_window=256, corpus_path="data/full_validation_text.txt"
-)
-
-EMBEDDING_DIM = 384
+CONTEXT_WINDOW = 128
+BATCH_SIZE = 192
+EMBEDDING_DIM = 128
 FF_DIM = 4 * EMBEDDING_DIM
 NUM_TRANSFORMERS = 12
-NUM_HEADS = 12
+NUM_HEADS = 2
+
+print("Loading data...")
+dataset = WikiDataset(
+    context_window=CONTEXT_WINDOW, corpus_path="data/full_train_text.txt"
+)
+val_dataset = WikiDataset(
+    context_window=CONTEXT_WINDOW, corpus_path="data/full_validation_text.txt"
+)
+
 VOCAB_SIZE = dataset.vocab_size
 
 transformer_layers = nn.ModuleList(
@@ -65,10 +70,10 @@ magic_layers = {
 
 
 dataloader = DataLoader(
-    dataset, batch_size=16, shuffle=True, collate_fn=dataset.collate_fn
+    dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=dataset.collate_fn
 )
 val_dataloader = DataLoader(
-    val_dataset, batch_size=16, shuffle=True, collate_fn=val_dataset.collate_fn
+    val_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=val_dataset.collate_fn
 )
 
 wandb_project = "small-bert"
