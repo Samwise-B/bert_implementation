@@ -23,12 +23,12 @@ def count_parameters(model):
 
 
 print("Loading data...")
-dataset = WikiDataset(context_window=512, corpus_path="data/full_train_text.txt")
+dataset = WikiDataset(context_window=256, corpus_path="data/full_train_text.txt")
 val_dataset = WikiDataset(
-    context_window=512, corpus_path="data/full_validation_text.txt"
+    context_window=256, corpus_path="data/full_validation_text.txt"
 )
 
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 384
 FF_DIM = 4 * EMBEDDING_DIM
 NUM_TRANSFORMERS = 12
 NUM_HEADS = 12
@@ -59,8 +59,8 @@ magic_layers = {
     #     Naive(EMBEDDING_DIM),
     # ),
     # "own-single-head-transformer": OwnSingleHeadTransformer(EMBEDDING_DIM, FF_DIM),
-    "BASELINE": nn.Sequential(*baseline_transformer_layers),
-    #"BERT": nn.Sequential(*transformer_layers)
+    # "BASELINE": nn.Sequential(*baseline_transformer_layers),
+    "BERT": nn.Sequential(*transformer_layers)
 }
 
 
@@ -71,7 +71,7 @@ val_dataloader = DataLoader(
     val_dataset, batch_size=16, shuffle=True, collate_fn=val_dataset.collate_fn
 )
 
-wandb_project = "baby-bert"
+wandb_project = "small-bert"
 
 criterion = nn.CrossEntropyLoss()
 
